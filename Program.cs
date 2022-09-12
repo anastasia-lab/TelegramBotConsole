@@ -7,6 +7,9 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.ReplyMarkups;
 using System.IO;
+using System.Net;
+using System.Xml.Linq;
+using System.Linq;
 
 namespace TelegramBotConsole
 {
@@ -42,7 +45,7 @@ namespace TelegramBotConsole
                             new []
                             {
                                 new KeyboardButton("Курс валют"),
-                                 new KeyboardButton("Сохранить файл")
+                                new KeyboardButton("Сохранить файл")
                             },
 
                         });
@@ -88,6 +91,33 @@ namespace TelegramBotConsole
         /// <returns></returns>
         public static async Task GetMessageCurrencyRateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            string urlCurse = $"https://www.cbr-xml-daily.ru/daily.xml";
+
+            WebClient client = new WebClient();
+            var xml = client.DownloadString(urlCurse);
+            XDocument xdoc = XDocument.Parse(xml);
+            var elementCurse = xdoc.Element("ValCurs").Elements("Valute");
+            string CurseDollar = elementCurse.Where(x => x.Attribute("ID").Value == "R01235").Select(x => x.Element("Value").Value).FirstOrDefault();
+            string CurseEuro = elementCurse.Where(x => x.Attribute("ID").Value == "R01239").Select(x => x.Element("Value").Value).FirstOrDefault();
+           
+
+            var keyboard = new ReplyKeyboardMarkup(new[]
+            {
+                new []
+                {
+                    new KeyboardButton("Доллар"),
+                    new KeyboardButton("Евро")
+                },
+
+            });
+
+            keyboard.ResizeKeyboard = true;
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, "Выберите валюту", replyMarkup: keyboard);
+
+            if (update.Message.Text.Contains("Доллар"))
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"Курс доллара на {DateTime.Now.ToShortDateString()} составляет {CurseDollar}");
+            else if (update.Message.Text.Contains("Евро"))
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"Курс евро на {DateTime.Now.ToShortDateString()} составляет {CurseEuro}");
 
         }
 
