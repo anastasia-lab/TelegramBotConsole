@@ -44,15 +44,16 @@ namespace TelegramBotConsole
                         {
                             new []
                             {
-                                new KeyboardButton("Курс валют"),
+                                new KeyboardButton("Узнать курс валют"),
                                 new KeyboardButton("Сохранить файл")
                             },
 
                         });
 
                         keyboard.ResizeKeyboard = true; // изменение размера клавиатуры
+                        keyboard.OneTimeKeyboard = true; // скрывает клавиатуру, как только она будет использована
 
-                        Thread.Sleep(1000);
+                        Thread.Sleep(500);
 
                         //чтобы пользователь увидел клавиатуру
                         await botClient.SendTextMessageAsync(message.Chat.Id, text: "Что хотите сделать", replyMarkup: keyboard);
@@ -64,7 +65,7 @@ namespace TelegramBotConsole
 
                     switch (message.Text)
                     {
-                        case "Курс валют":
+                        case "Узнать курс валют":
                             await GetMessageCurrencyRateAsync(botClient, update, cancellationToken);
                             break;
                         case "Сохранить файл":
@@ -72,12 +73,12 @@ namespace TelegramBotConsole
                             break;
                     }
                 }
-
-                if (update.Type == Telegram.Bot.Types.Enums.UpdateType.CallbackQuery)
-                {
-                    await HandleCallbackQueryAsync(botClient, update.CallbackQuery);
-                    return;
-                }
+            }
+            
+            if (update.Type == Telegram.Bot.Types.Enums.UpdateType.CallbackQuery)
+            {
+               await HandleCallbackQueryAsync(botClient, update.CallbackQuery);
+               return;
             }
         }
 
@@ -99,26 +100,32 @@ namespace TelegramBotConsole
             var elementCurse = xdoc.Element("ValCurs").Elements("Valute");
             string CurseDollar = elementCurse.Where(x => x.Attribute("ID").Value == "R01235").Select(x => x.Element("Value").Value).FirstOrDefault();
             string CurseEuro = elementCurse.Where(x => x.Attribute("ID").Value == "R01239").Select(x => x.Element("Value").Value).FirstOrDefault();
-           
+            string CurseTurkishLira = elementCurse.Where(x => x.Attribute("ID").Value == "R01700J").Select(x => x.Element("Value").Value).FirstOrDefault();
+            string CurseBritishPoundSterling = elementCurse.Where(x => x.Attribute("ID").Value == "R01035").Select(x => x.Element("Value").Value).FirstOrDefault();
 
-            var keyboard = new ReplyKeyboardMarkup(new[]
+            string CallBackCurseEuro = $"Курс евро: {CurseEuro}";
+            string CallBackCurseDollar = $"Курс доллара: {CurseDollar}";
+            string CallBackCurseTurkishLira = $"Курс Турецкой лиры: {CurseDollar}";
+            string CallBackCurseBritishPoundSterling = $"Курс Фунта стерлинга: {CurseDollar}";
+
+            InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(new[]
             {
-                new []
+                new[]
                 {
-                    new KeyboardButton("Доллар"),
-                    new KeyboardButton("Евро")
+                    InlineKeyboardButton.WithCallbackData(text: "Курс Доллара США 💵", callbackData:$"{CallBackCurseDollar}"),
+                    InlineKeyboardButton.WithCallbackData(text: "Курс Евро 💶", $"{CallBackCurseEuro}"),
                 },
 
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData(text: "Курс Турецкой лиры 💳", callbackData:$"{CallBackCurseTurkishLira}"),
+                    InlineKeyboardButton.WithCallbackData(text: "Курс Британского фунта стерлинга 💷", $"{CallBackCurseBritishPoundSterling}"),
+                },
             });
 
-            keyboard.ResizeKeyboard = true;
-            await botClient.SendTextMessageAsync(update.Message.Chat.Id, "Выберите валюту", replyMarkup: keyboard);
-
-            if (update.Message.Text.Contains("Доллар"))
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"Курс доллара на {DateTime.Now.ToShortDateString()} составляет {CurseDollar}");
-            else if (update.Message.Text.Contains("Евро"))
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"Курс евро на {DateTime.Now.ToShortDateString()} составляет {CurseEuro}");
-
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text:"Выберите валюту", replyMarkup: inlineKeyboard);
+            Thread.Sleep(500);
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Сегодня {DateTime.Now.ToShortDateString()}");
         }
 
         /// <summary>
@@ -186,26 +193,28 @@ namespace TelegramBotConsole
         {
             string[] fileArray = Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly);
 
-            for (int i = 0; i < fileArray.Length; i++)
-            {
-                var lineKeyBoard = new InlineKeyboardMarkup(new[]
-                {
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData(fileArray[i], callbackData: fileArray[i])
-                    }
-                });
+            //for (int i = 0; i < fileArray.Length; i++)
+            //{
+            //    var lineKeyBoard = new InlineKeyboardMarkup(new[]
+            //    {
+            //        new[]
+            //        {
+            //            InlineKeyboardButton.WithCallbackData(fileArray[i], callbackData: fileArray[i])
+            //        }
+            //    });
 
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "...", replyMarkup: lineKeyBoard);
-            }
+            //    await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "...", replyMarkup: lineKeyBoard);
+            //}
 
         }
 
         public static async Task HandleCallbackQueryAsync(ITelegramBotClient botClient, CallbackQuery callbackQuery)
         {
-                //if (callbackQuery.Data == )
-                //    await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, text: $"{callbackQuery.Data}");
-            
+            if (callbackQuery.Data.StartsWith("Курс"))
+            {
+                await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, text: $"{callbackQuery.Data}");
+            }
+            return;
         }
 
         /// <summary>
