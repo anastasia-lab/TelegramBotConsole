@@ -11,6 +11,7 @@ using System.Net;
 using System.Xml.Linq;
 using System.Linq;
 using System.Collections.Generic;
+using System.Text;
 
 namespace TelegramBotConsole
 {
@@ -125,7 +126,24 @@ namespace TelegramBotConsole
 
             await botClient.SendTextMessageAsync(update.Message.Chat.Id, text:"Выберите валюту", replyMarkup: inlineKeyboard);
             Thread.Sleep(500);
+
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                text: $"Файл с актуальным курсом валют сохранен на Вашем компьютере в папке \"Телеграм\" на рабочем столе");
+
             await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Сегодня {DateTime.Now.ToShortDateString()}");
+
+            string FilePath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.Desktop)}", @"Telegram",
+                $"Курс валют на {DateTime.Now.ToShortDateString()}.txt");
+
+            using var fileStream = System.IO.File.Create(FilePath);
+
+            using (StreamWriter streamWriter = new StreamWriter(fileStream, Encoding.UTF8))
+            {
+                streamWriter.Write($"Курс валют на {DateTime.Now.ToShortDateString()}:\n" +
+                    $"\0Курс евро {CurseEuro}\n Курс доллара: {CurseDollar}\n Курс Турецкой лиры: {CurseTurkishLira}\n" +
+                    $"\0Курс Британского фунта стерлинга: {CurseBritishPoundSterling}"
+                    );
+            }
         }
 
         /// <summary>
