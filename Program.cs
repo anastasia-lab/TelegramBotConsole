@@ -242,7 +242,7 @@ namespace TelegramBotConsole
                 },
             });
 
-            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Выбирите документ", replyMarkup: inlineKeyboard);
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Выберите документ", replyMarkup: inlineKeyboard);
 
             #region Курс валют
             
@@ -298,8 +298,7 @@ namespace TelegramBotConsole
         }
         
         
-        
-        
+       
         /// <summary>
         /// Обработчик нажатия inline кнопок
         /// </summary>
