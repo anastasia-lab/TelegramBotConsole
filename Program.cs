@@ -42,40 +42,32 @@ namespace TelegramBotConsole
                     if (message.Text.ToLower() == "/start")
                     {
                         await botClient.SendTextMessageAsync(message.Chat, $"Добро пожаловать в бот, {FirstNameUser}!");
-
-                        var keyboard = new ReplyKeyboardMarkup(new[]
-                        {
-                            new []
-                            {
-                                new KeyboardButton("Узнать курс валют"),
-                                new KeyboardButton("Посмотреть сохраненные файлы")
-                            },
-
-                        });
-
-                        keyboard.ResizeKeyboard = true; // изменение размера клавиатуры
-                        keyboard.OneTimeKeyboard = true; // скрывает клавиатуру, как только она будет использована
-                        Thread.Sleep(500);
-
-                        //чтобы пользователь увидел клавиатуру
-                        await botClient.SendTextMessageAsync(message.Chat.Id, text: "Что хотите сделать", replyMarkup: keyboard);
-
-
+                        await botClient.SendTextMessageAsync(message.Chat, $"Выберите команду");
+                        await GetButtonCommand(botClient, update);
                         return;
                     }
 
                     switch (message.Text)
                     {
-                        case "Узнать курс валют":
+                        case "/getcourse":
                             await GetMessageCurrencyRateAsync(botClient, update, cancellationToken);
                             break;
-                        case "Посмотреть сохраненные файлы":
-                            await ShowFilesAsync(botClient, update);
+                        case "/download":
+                            await ShowAnotherFileAsync(botClient, update);
+                            break;
+                        case "/downloadcurse":
+                            await ShowCurseFileAsync(botClient, update);
+                            break;
+                        case "/help":
+                            await botClient.SendTextMessageAsync(message.Chat, $"Что я могу");
+                            await GetButtonCommand(botClient, update);
                             break;
                         default:
-                            //await botClient.SendTextMessageAsync(message.Chat.Id, text: "Ой, такой команды я не знаю.");
-                            //await botClient.SendTextMessageAsync(message.Chat.Id, text: "Вы можете узнать актуальный курс валют или " +
-                            //    "посмотреть сохраненные файлы.");
+                            await botClient.SendTextMessageAsync(message.Chat.Id, text: "Ой, такой команды я не знаю.");
+                            await botClient.SendTextMessageAsync(message.Chat.Id, text: "Вы можете узнать актуальный курс валют или " +
+                                "посмотреть сохраненные файлы.");
+                            await botClient.SendTextMessageAsync(message.Chat.Id, text: "Если Вы отправите мне любой документ, то я сохраню его у себя." +
+                                "После Вы сможете его скачать.");
                             break;
                     }
                 }
@@ -96,6 +88,43 @@ namespace TelegramBotConsole
             }
         }
 
+        /// <summary>
+        /// Список команд
+        /// </summary>
+        /// <returns></returns>
+        public static async Task GetButtonCommand(ITelegramBotClient botClient, Update update)
+        {
+            List<BotCommand> command = new List<BotCommand>();
+
+            command.Add(new BotCommand
+            {
+                Command = "/getcourse",
+                Description = "узнать актуальный курс валют"
+            });
+
+            command.Add(new BotCommand
+            {
+                Command = "/download",
+                Description = "список загруженных документов"
+            });
+
+            command.Add(new BotCommand
+            {
+                Command = "/downloadcurse",
+                Description = "список курсов валют за разные даты"
+            });
+
+
+            command.Add(new BotCommand
+            {
+                Command = "/help",
+                Description = "список команд"
+            });
+
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, string.Join("\n", command.Select(s=> s.Command + " - " + s.Description)));
+
+            return;
+        }
 
         /// <summary>
         /// Получение информации об актуальном курсе валют
@@ -134,13 +163,14 @@ namespace TelegramBotConsole
             });
 
             await botClient.SendTextMessageAsync(update.Message.Chat.Id, text:"Выберите валюту", replyMarkup: inlineKeyboard);
-            //Thread.Sleep(500);
 
             await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Сегодня {DateTime.Now.ToShortDateString()}");
 
-            if (!Directory.Exists(Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram",@"Курс валют")))
+            if (!Directory.Exists(Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram",
+                @"Курс валют")))
             {
-                Directory.CreateDirectory(Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram", @"Курс валют"));
+                Directory.CreateDirectory(Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram", 
+                    @"Курс валют"));
             }
 
             string FilePath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram",
@@ -166,10 +196,12 @@ namespace TelegramBotConsole
         /// <returns></returns>
         public static async Task SaveFilesAsync(ITelegramBotClient botClient, Update update)
         {
+           
             if (update.Message.Document != null)
             {
                 await DownloadFilesAsync(update.Message.Document.FileId, update.Message.Document.FileName, update);
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text:$"Файл {update.Message.Document.FileName} сохранен. Тип: {update.Message.Type}", 
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text:$"Файл {update.Message.Document.FileName} сохранен.\n" +
+                    $"Тип: {update.Message.Type}", 
                     replyToMessageId: update.Message.MessageId);
                 return;
             }
@@ -181,15 +213,15 @@ namespace TelegramBotConsole
                 string ImageName = ImagePath[ImagePath.Length - 1];
 
                 await DownloadFilesAsync(update.Message.Photo.Last().FileId, ImageName, update);
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Файл {ImageName} сохранен. Тип: {update.Message.Type}", 
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Файл {ImageName} сохранен.\nТип: {update.Message.Type}", 
                     replyToMessageId: update.Message.MessageId);
             }
 
             if (update.Message.Audio != null)
             {
                 await DownloadFilesAsync(update.Message.Audio.FileId, update.Message.Audio.FileName, update);
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Файл сохранен.",
-                    replyToMessageId: update.Message.MessageId);
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: $"Файл {update.Message.Audio.FileName} сохранен." +
+                    $"\nТип файла:{update.Message.Type} ", replyToMessageId: update.Message.MessageId);
                 return;
             }
         }
@@ -219,86 +251,75 @@ namespace TelegramBotConsole
         }
 
         /// <summary>
-        /// Список имеющихся файлов для загрузки
+        /// Список имеющихся файлов сохраненных курсов валют за разные даты
         /// </summary>
         /// <param name="botClient"></param>
-        /// <param name="path"></param>
         /// <param name="update"></param>
         /// <returns></returns>
-        public static async Task ShowFilesAsync(ITelegramBotClient botClient, Update update)
+        public static async Task ShowCurseFileAsync(ITelegramBotClient botClient, Update update)
         {
-            string CombainPath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram");
+            string CombainPath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram", @"Курс валют");
             if (!Directory.Exists(CombainPath))
             {
                 await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Ой. Кажется, что-то пошло не то.");
             }
 
-            InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(new[]
-            {
-                new[]
-                {
-                    InlineKeyboardButton.WithCallbackData(text: "Список сохраненных курсов валют", callbackData: $"{ShowCurseFileAsync(botClient,update)}"),
-                    InlineKeyboardButton.WithCallbackData(text: "Список сохраненных документов", callbackData:$""),
-                },
-            });
-
-            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Выберите документ", replyMarkup: inlineKeyboard);
-
-            #region Курс валют
-            
-            //var directoryCurse = new DirectoryInfo(Path.Combine(CombainPath, "Курс валют"));
-            //FileInfo[] CurseFiles = directoryCurse.GetFiles();
-
-            //await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлы");
-
-            //foreach (var CurseFile in CurseFiles)
-            //{
-            //    await using Stream stream = System.IO.File.OpenRead(CurseFile.FullName);
-            //    Message message = await botClient.SendDocumentAsync(
-            //    chatId: update.Message.Chat.Id,
-            //    document: new InputOnlineFile(content: stream, fileName: CurseFile.Name));
-            //}
-            #endregion
-
-            #region Документы
-            //var directoryDocuments = new DirectoryInfo(Path.Combine(CombainPath, "Документы"));
-            //FileInfo[] DocumentFiles = directoryCurse.GetFiles();
-
-            //foreach (var DocumentFile in DocumentFiles)
-            //{
-            //    await using Stream stream = System.IO.File.OpenRead(DocumentFile.FullName);
-            //    Message message = await botClient.SendDocumentAsync(
-            //    chatId: update.Message.Chat.Id,
-            //    document: new InputOnlineFile(content: stream, fileName: DocumentFile.Name));
-            //}
-            #endregion
-        }
-
-
-        private static async Task ShowCurseFileAsync(ITelegramBotClient botClient, Update update)
-        {
-            string CombainPath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram");
-            if (!Directory.Exists(CombainPath))
-            {
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Ой. Кажется, что-то пошло не то.");
-            }
-
-            var directoryCurse = new DirectoryInfo(Path.Combine(CombainPath, "Курс валют"));
+            var directoryCurse = new DirectoryInfo(CombainPath);
             FileInfo[] CurseFiles = directoryCurse.GetFiles();
 
-            await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлы");
+            if (CurseFiles.Length == 0)
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлов пока нет.");
 
-            foreach (var CurseFile in CurseFiles)
+            if (CurseFiles.Length != 0)
             {
-                await using Stream stream = System.IO.File.OpenRead(CurseFile.FullName);
-                Message message = await botClient.SendDocumentAsync(
-                chatId: update.Message.Chat.Id,
-                document: new InputOnlineFile(content: stream, fileName: CurseFile.Name));
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлов пока нет.");
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлы");
+
+                foreach (var CurseFile in CurseFiles)
+                {
+                    await using Stream stream = System.IO.File.OpenRead(CurseFile.FullName);
+                    Message message = await botClient.SendDocumentAsync(
+                    chatId: update.Message.Chat.Id,
+                    document: new InputOnlineFile(content: stream, fileName: CurseFile.Name));
+                }
             }
         }
-        
-        
-       
+
+        /// <summary>
+        /// Список различных сохраненных файлов 
+        /// </summary>
+        /// <param name="botClient"></param>
+        /// <param name="update"></param>
+        /// <returns></returns>
+        public static async Task ShowAnotherFileAsync(ITelegramBotClient botClient, Update update)
+        {
+            string CombainPath = Path.Combine($@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}", @"Telegram", @"Документы");
+            if (!Directory.Exists(CombainPath))
+            {
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Ой. Кажется, что-то пошло не то.");
+            }
+
+            var directoryDoc = new DirectoryInfo(CombainPath);
+            FileInfo[] DocFiles = directoryDoc.GetFiles();
+
+            if(DocFiles.Length == 0)
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлов пока нет.");
+
+            if (DocFiles.Length != 0)
+            {
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Файлы");
+
+                foreach (var DocFile in DocFiles)
+                {
+                    await using Stream stream = System.IO.File.OpenRead(DocFile.FullName);
+                    Message message = await botClient.SendDocumentAsync(
+                    chatId: update.Message.Chat.Id,
+                    document: new InputOnlineFile(content: stream, fileName: DocFile.Name));
+
+                }
+            }
+        }
+    
         /// <summary>
         /// Обработчик нажатия inline кнопок
         /// </summary>
@@ -312,15 +333,6 @@ namespace TelegramBotConsole
                 await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, text: $"{callbackQuery.Data}");
             }
 
-            if (callbackQuery.Data.StartsWith("Список сохраненных курсов валют"))
-            {
-                await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, text: $"{callbackQuery.Data}");
-            }
-
-            if (callbackQuery.Data.StartsWith("Список сохраненных документов"))
-            {
-                await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, text: $"{callbackQuery.Data}");
-            }
             return;
         }
 
@@ -341,8 +353,6 @@ namespace TelegramBotConsole
 
             Console.WriteLine(ErrorMessage);
             return Task.CompletedTask;
-
-            //Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
         }
 
 
@@ -362,6 +372,7 @@ namespace TelegramBotConsole
                 receiverOptions,
                 cancellationToken
             );
+
             Console.ReadLine();
       
         }
